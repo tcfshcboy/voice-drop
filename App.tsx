@@ -530,18 +530,18 @@ export default function App() {
             >
               <div className="space-y-6">
                 <div className="bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-xl">
-                  <h4 className="font-bold text-cyan-400 mb-2 text-lg">📌 嚴格身分驗證 (Updated)</h4>
+                  <h4 className="font-bold text-cyan-400 mb-2 text-lg">📌 Google 帳號驗證 </h4>
                   <p className="mb-3 leading-relaxed">
-                    本系統全面升級為 <span className="text-white font-bold">Google Sign-In</span> 驗證。投稿時必須登入 Google 帳號，系統將自動驗證身分真實性。
+                    小編努力將系統做到 <span className="text-white font-bold">Google Sign-In</span> 驗證。因此與過去表單投稿方式相同，您必須登入 Google 帳號，非 Google 帳號無法投稿。
                   </p>
                   <div className="bg-cyan-900/40 p-3 rounded-lg text-sm text-cyan-200 border border-cyan-500/20">
-                    💡 <strong>一中生標章：</strong> 系統偵測到您使用學校信箱 (<span className="font-mono">@std.tcfsh.tc.edu.tw</span>) 登入時，將自動標註為「一中生投稿」。其餘 Google 帳號則標註為「一般投稿」。
+                    💡 <strong>一中生標章：</strong> 系統偵測到您使用學校信箱 (<span className="font-mono">@std.tcfsh.tc.edu.tw</span>) 登入時，將自動標註為<span className="text-white font-bold">「一中生投稿」</span>。其餘 Google 帳號則標註為<span className="text-white font-bold">「一般投稿」</span>。
                   </div>
                 </div>
                 
                 <div className="bg-zinc-800 p-4 rounded-xl">
-                  <h4 className="font-bold text-zinc-400 mb-2 text-lg">📌 隱私承諾</h4>
-                  <p>您的帳號僅用於身分驗證與防止濫用，<span className="text-white font-bold">不會</span>公開顯示您的姓名或 Email，請安心投稿。</p>
+                  <h4 className="font-bold text-cyan-400 mb-2 text-lg">📌 匿名隱私承諾</h4>
+                  <p>您的帳號僅用於身分驗證與防止非法濫用，以維護IG版的投稿品質。靠北版<span className="text-white font-bold">不會</span>公開顯示您的 Email，請安心投稿。</p>
                 </div>
               </div>
             </Modal>
@@ -710,7 +710,7 @@ export default function App() {
               ))}
             </div>
             <div className="flex justify-start">
-               <button onClick={prevStep} className="text-zinc-500 hover:text-white flex items-center text-sm font-mono mt-4">
+               <button onClick={prevStep} className="text-zinc-200 hover:text-white flex items-center text-sm font-mono mt-4">
                  <ChevronLeft size={16} /> BACK
                </button>
             </div>
@@ -1028,7 +1028,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="p-6 text-center text-xs text-zinc-500 font-mono">
+      <footer className="p-6 text-center text-xs text-zinc-200 font-mono">
         &copy; {new Date().getFullYear()} <a href="https://www.instagram.com/tcfsh_cboy/" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors underline underline-offset-2">TCFSH_CBOY</a>. Designed with 🍡 Power.
       </footer>
     </div>
