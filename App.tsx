@@ -567,7 +567,7 @@ export default function App() {
                 <h4 className="font-bold text-white text-lg mb-2 flex items-center gap-2">
                    <span>📜</span> 【投稿細部規則】
                 </h4>
-                <p className="text-zinc-400 text-sm mb-4">
+                <p className="text-lime-400 text-sm mb-4">
                   請注意：若投稿內容出現以下所述情形，小編會依照規則予以刪文或保留。
                 </p>
 
@@ -627,7 +627,7 @@ export default function App() {
                 {/* Section IV: Political Speech */}
                 <div className="bg-green-900/10 border border-green-500/30 p-4 rounded-xl space-y-3">
                    <h5 className="font-bold text-green-400 text-base">✏️ 四、政治型言論 (皆不限制)</h5>
-                   <p className="text-xs text-zinc-500 mb-2">我們尊重所有政治立場的表達。</p>
+                   <p className="text-xs text-lime-500 mb-2">我們尊重所有政治立場的表達。</p>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-zinc-300">
                       <div className="flex items-center gap-2">
                         <span className="bg-lime-500/20 text-lime-400 text-xs px-2 py-0.5 rounded font-bold">保留</span>
@@ -678,7 +678,7 @@ export default function App() {
                    </ul>
                 </div>
                 
-                <div className="text-center text-xs text-zinc-600 mt-6 font-mono">
+                <div className="text-center text-xs text-zinc-300 mt-6 font-mono">
                    * 以上審稿細則將每 3~6 個月進行意見調查與調整。
                 </div>
               </div>
@@ -909,7 +909,7 @@ export default function App() {
                         <>
                           <p className="text-zinc-400 text-sm">請登入 Google 帳號以驗證真實身分</p>
                           <div id="google-signin-btn" ref={googleBtnRef} className="h-12 flex justify-center"></div>
-                          <p className="text-xs text-zinc-600">※ 系統將自動判讀是否為一中生</p>
+                          <p className="text-xs text-lime-400">※ 系統將自動判讀是否為一中生</p>
                         </>
                       )}
                    </div>
