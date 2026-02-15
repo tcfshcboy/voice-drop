@@ -11,7 +11,6 @@ import {
   Gift, 
   AlertOctagon, 
   CheckCircle2,
-  ChevronRight,
   ChevronLeft,
   Image as ImageIcon,
   X,
@@ -20,15 +19,25 @@ import {
   Info,
   UploadCloud,
   FileImage,
-  Mail,
   BadgeCheck,
-  User
+  User,
+  LogOut
 } from 'lucide-react';
+
+// Add global type definition for Google Identity Services
+declare global {
+  interface Window {
+    google: any;
+  }
+}
 
 // --- CONFIGURATION ---
 // ⚠️ [重要] 請將此處替換為您在 Apps Script 部署後取得的 "Web App URL"
-// 網址格式通常為: https://script.google.com/macros/s/......./exec
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwMEU3vYVDZA9xMgINZF0OjZ_4d6vk4jap8tIPOt08M7nNAl-zRjlPDlQEueAj3vTzF5g/exec";
+
+// ⚠️ [重要] 請在此填入您的 Google Cloud Console Client ID
+// 格式通常是: "xxxxxxxx-xxxxxxxx.apps.googleusercontent.com"
+const GOOGLE_CLIENT_ID = "1003959654198-blqqu860q4n44m0s4vkmnauqrm8c6d67.apps.googleusercontent.com"; 
 
 // --- TYPES & CONSTANTS ---
 
@@ -39,8 +48,8 @@ type CategoryType = {
   limit: number;
   color: string;
   desc: string;
-  mood: 'idle' | 'happy' | 'shocked' | 'love' | 'thinking' | 'sad' | 'writing' | 'lying' | 'rules'; // Added writing, lying, rules
-  placeholder: string; // Added placeholder
+  mood: 'idle' | 'happy' | 'shocked' | 'love' | 'thinking' | 'sad' | 'writing' | 'lying' | 'rules';
+  placeholder: string;
 };
 
 const CATEGORIES: CategoryType[] = [
@@ -126,13 +135,19 @@ const CATEGORIES: CategoryType[] = [
   },
 ];
 
+type UserProfile = {
+  email: string;
+  name: string;
+  picture: string;
+  credential: string; // The raw JWT token
+};
+
 type FormState = {
   agreed: boolean;
   category: CategoryType | null;
   content: string;
   hasImage: boolean;
   imageFile: File | null;
-  email: string; // New field
 };
 
 const INITIAL_FORM_STATE: FormState = {
@@ -141,8 +156,38 @@ const INITIAL_FORM_STATE: FormState = {
   content: '',
   hasImage: false,
   imageFile: null,
-  email: ''
 };
+
+// --- HELPERS ---
+
+// JWT Decoder to extract user info client-side
+const decodeJwt = (token: string): any => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
+// Strict Identity Validation Logic
+const checkIdentity = (email: string) => {
+    if (!email) return { valid: false, msg: '未登入', type: 'none', label: '', color: '' };
+    
+    const lowerEmail = email.toLowerCase().trim();
+
+    // 1. Specific School Student
+    if (lowerEmail.endsWith('@std.tcfsh.tc.edu.tw')) {
+        return { valid: true, type: 'school', label: '一中生投稿', color: 'text-green-400 border-green-500' };
+    }
+    
+    // 2. Google Account (General)
+    return { valid: true, type: 'general', label: '一般投稿', color: 'text-blue-400 border-blue-500' };
+}
 
 // --- COMPONENTS ---
 
@@ -202,7 +247,7 @@ const StepLayout = ({ title, children, dangoMood = 'idle' }: { title: string, ch
   </motion.div>
 );
 
-const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }) => {
+const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title: string; children?: React.ReactNode }) => {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -256,15 +301,18 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose:
 export default function App() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL_FORM_STATE);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [activeModal, setActiveModal] = useState<'identity' | 'rules' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
-  // Background particle effect
+  // Initialize Google Identity Services
   useEffect(() => {
-    // Just a placeholder for potential canvas effect, keeping it simple for now
+    // Only initialize if we are on the step that requires login or globally once
+    // But GSI needs to be re-rendered in the DOM element
   }, []);
 
   const nextStep = () => setStep(s => s + 1);
@@ -272,6 +320,7 @@ export default function App() {
   
   const resetForm = () => {
       setForm(INITIAL_FORM_STATE);
+      // We keep the user logged in for convenience
       setStep(0);
       setSubmitted(false);
       setErrorMsg(null);
@@ -298,10 +347,6 @@ export default function App() {
     }
   };
 
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setForm({...form, email: e.target.value});
-  }
-
   // Helper to convert file to Base64
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -311,57 +356,72 @@ export default function App() {
       reader.onerror = error => reject(error);
     });
   };
-  
-  // Strict Identity Validation Logic
-  const checkEmailStatus = (email: string) => {
-      if (!email) return { valid: false, msg: '必填' };
-      
-      const lowerEmail = email.toLowerCase().trim();
 
-      // Check length > 12 characters (must be strictly greater than 12)
-      if (lowerEmail.length <= 12) {
-          return { valid: false, msg: '僅接受 Google 或教育信箱', color: 'text-red-500' };
-      }
-      
-      // 1. Specific School Student
-      if (lowerEmail.endsWith('@std.tcfsh.tc.edu.tw')) {
-          return { valid: true, type: 'school', label: '一中生投稿', color: 'text-green-400' };
-      }
-      
-      // 2. Google Account
-      if (lowerEmail.endsWith('@gmail.com')) {
-           return { valid: true, type: 'general', label: '一般投稿', color: 'text-blue-400' };
-      }
+  const handleGoogleCredentialResponse = (response: any) => {
+    const decoded = decodeJwt(response.credential);
+    if (decoded) {
+      setUser({
+        email: decoded.email,
+        name: decoded.name,
+        picture: decoded.picture,
+        credential: response.credential
+      });
+    }
+  };
 
-      // 3. Other tc.edu.tw domains (General)
-      if (lowerEmail.endsWith('tc.edu.tw')) {
-           return { valid: true, type: 'general', label: '一般投稿', color: 'text-blue-400' };
+  // Google Sign-In Initialization with Configuration Check
+  useEffect(() => {
+    if (step === 4 && !user) {
+      // Configuration Check
+      if (GOOGLE_CLIENT_ID.includes("YOUR_GOOGLE_CLIENT_ID")) {
+        console.error("Critical: Google Client ID is not configured in App.tsx");
+        return;
       }
 
-      return { valid: false, msg: '僅接受 Google 或教育信箱', color: 'text-red-500' };
-  }
+      if (window.google) {
+        try {
+          // Initialize GSI
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleGoogleCredentialResponse,
+            auto_select: false, 
+            cancel_on_tap_outside: true
+          });
+          
+          // Render button
+          const btnDiv = document.getElementById("google-signin-btn");
+          if (btnDiv) {
+            // Clear previous instances to prevent duplicates
+            btnDiv.innerHTML = '';
+            window.google.accounts.id.renderButton(
+              btnDiv,
+              { theme: "filled_black", size: "large", shape: "pill", width: "300" }
+            );
+          }
+        } catch (e) {
+          console.error("Google Sign-In initialization failed", e);
+        }
+      }
+    }
+  }, [step, user]);
 
   const handleSubmit = async () => {
-    if (!form.category) return;
+    if (!form.category || !user) return;
     
-    // Final validation before submit
-    const emailStatus = checkEmailStatus(form.email);
-    if (!emailStatus.valid) return;
-
     setIsSubmitting(true);
     setErrorMsg(null);
 
+    // Payload now sends the credential (token) instead of just the email string
     let payload: any = {
         agreed: form.agreed ? "是" : "否",
         category: form.category.label,
         content: form.content,
         hasImage: form.hasImage ? "有" : "沒有",
-        email: form.email, // Send email as is
-        imageLink: "" // Fallback
+        token: user.credential, // Send the JWT!
+        imageLink: ""
     };
 
     try {
-        // Handle File Upload if exists
         if (form.hasImage && form.imageFile) {
             const base64Data = await fileToBase64(form.imageFile);
             const cleanBase64 = base64Data.includes(',') 
@@ -465,41 +525,156 @@ export default function App() {
             >
               <div className="space-y-6">
                 <div className="bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-xl">
-                  <h4 className="font-bold text-cyan-400 mb-2 text-lg">📌 身分標註認證</h4>
+                  <h4 className="font-bold text-cyan-400 mb-2 text-lg">📌 嚴格身分驗證 (Updated)</h4>
                   <p className="mb-3 leading-relaxed">
-                    透過使用<span className="text-white font-bold">在學 Gmail 帳號</span>填寫投稿表單，即可以「一中生」身份發言，且投稿上將標註。
+                    本系統全面升級為 <span className="text-white font-bold">Google Sign-In</span> 驗證。投稿時必須登入 Google 帳號，系統將自動驗證身分真實性。
                   </p>
                   <div className="bg-cyan-900/40 p-3 rounded-lg text-sm text-cyan-200 border border-cyan-500/20">
-                    💡 舉例：若您希望被標註「一中生投稿」，請記得在最後確認頁面填入學生 Gmail 帳號 
-                    <br/>
-                    (如 <span className="font-mono text-cyan-100 bg-black/30 px-1 rounded">xxxx@std.tcfsh.tc.edu.tw</span>)。
+                    💡 <strong>一中生標章：</strong> 系統偵測到您使用學校信箱 (<span className="font-mono">@std.tcfsh.tc.edu.tw</span>) 登入時，將自動標註為「一中生投稿」。其餘 Google 帳號則標註為「一般投稿」。
                   </div>
                 </div>
                 
                 <div className="bg-zinc-800 p-4 rounded-xl">
-                  <h4 className="font-bold text-zinc-400 mb-2 text-lg">📌 強制 Gmail 登錄</h4>
-                  <p>為防範濫用，系統<span className="text-white font-bold">強制</span>要求填入有效的 Google 帳號或 tc.edu.tw 教育信箱。若非上述兩者，將無法送出投稿。</p>
+                  <h4 className="font-bold text-zinc-400 mb-2 text-lg">📌 隱私承諾</h4>
+                  <p>您的帳號僅用於身分驗證與防止濫用，<span className="text-white font-bold">不會</span>公開顯示您的姓名或 Email，請安心投稿。</p>
                 </div>
               </div>
             </Modal>
-
+            
             <Modal 
               isOpen={activeModal === 'rules'} 
               onClose={() => setActiveModal(null)} 
-              title="投稿細則"
+              title="投稿審稿細則"
             >
-              <div className="space-y-8">
-                <section>
-                  <h4 className="text-lg font-bold text-white mb-3 border-l-4 border-lime-400 pl-3">【投稿基本規則】</h4>
-                  <ul className="list-disc pl-5 space-y-2 text-zinc-300">
-                    <li>無人身攻擊或人格污辱</li>
-                    <li>無違反 Meta 社群守則</li>
-                    <li>無觸犯個人隱私</li>
-                  </ul>
-                </section>
-                {/* Simplified rules content for brevity in this update, keeping layout consistent */}
-                <div className="text-center text-zinc-500">
-                    ... (同前述規則) ...
+              <div className="space-y-6 text-sm md:text-base">
+                {/* Intro */}
+                <div className="bg-zinc-800/50 p-4 rounded-xl border-l-4 border-lime-400 text-zinc-300 space-y-2">
+                   <h4 className="font-bold text-white text-lg">【投稿基本規則】</h4>
+                   <ul className="list-disc pl-5 space-y-1">
+                      <li>無人身攻擊或人格污辱</li>
+                      <li>無違反 Meta 社群守則</li>
+                      <li>無觸犯個人隱私</li>
+                   </ul>
+                </div>
+
+                <div className="border-t border-zinc-700 my-4" />
+
+                <h4 className="font-bold text-white text-lg mb-2 flex items-center gap-2">
+                   <span>📜</span> 【投稿細部規則】
+                </h4>
+                <p className="text-zinc-400 text-sm mb-4">
+                  請注意：若投稿內容出現以下所述情形，小編會依照規則予以刪文或保留。
+                </p>
+
+                {/* Section I: Discrimination */}
+                <div className="bg-red-900/10 border border-red-500/30 p-4 rounded-xl space-y-3">
+                   <h5 className="font-bold text-red-400 text-base">✏️ 一、歧視型言論 (傷害特定群體)</h5>
+                   <ul className="space-y-2 text-zinc-300">
+                      <li className="flex items-start gap-2">
+                        <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded font-bold shrink-0 mt-0.5">刪文</span>
+                        <span>針對特定群體/個人(如種族、性別、宗教、性傾向等) 的特徵進行貶低。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded font-bold shrink-0 mt-0.5">刪文</span>
+                        <span>強化刻板印象，將特定群體/個人與負面形象的連結加深。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded font-bold shrink-0 mt-0.5">刪文</span>
+                        <span>否定人性，將特定群體/個人視為低等或非人。</span>
+                      </li>
+                   </ul>
+                </div>
+
+                {/* Section II: Hate Speech */}
+                <div className="bg-red-900/10 border border-red-500/30 p-4 rounded-xl space-y-3">
+                   <h5 className="font-bold text-red-400 text-base">✏️ 二、仇恨型言論 (導致社群分裂)</h5>
+                   <ul className="space-y-2 text-zinc-300">
+                      <li className="flex items-start gap-2">
+                        <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded font-bold shrink-0 mt-0.5">刪文</span>
+                        <span>試圖製造敵意，挑起不同群體之間對立。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded font-bold shrink-0 mt-0.5">刪文</span>
+                        <span>煽動暴力，鼓勵針對特定群體從事暴力行為。</span>
+                      </li>
+                   </ul>
+                </div>
+
+                {/* Section III: Radical Speech */}
+                <div className="bg-zinc-800 border border-zinc-700 p-4 rounded-xl space-y-3">
+                   <h5 className="font-bold text-yellow-400 text-base">✏️ 三、偏激型言論 (部分限制)</h5>
+                   <ul className="space-y-2 text-zinc-300">
+                      <li className="flex items-start gap-2">
+                        <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded font-bold shrink-0 mt-0.5">刪文</span>
+                        <span>事實的偏離。無陳述客觀事實，可能基於個人偏見或情緒來發言。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-lime-500/20 text-lime-400 text-xs px-2 py-0.5 rounded font-bold shrink-0 mt-0.5">保留</span>
+                        <span>情緒激動。如使用強烈、誇張的語氣表達個人情感。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                         <span className="bg-lime-500/20 text-lime-400 text-xs px-2 py-0.5 rounded font-bold shrink-0 mt-0.5">保留</span>
+                        <span>觀點過簡化。將複雜問題簡單化，忽略其他方面的因素。</span>
+                      </li>
+                   </ul>
+                </div>
+
+                {/* Section IV: Political Speech */}
+                <div className="bg-green-900/10 border border-green-500/30 p-4 rounded-xl space-y-3">
+                   <h5 className="font-bold text-green-400 text-base">✏️ 四、政治型言論 (皆不限制)</h5>
+                   <p className="text-xs text-zinc-500 mb-2">我們尊重所有政治立場的表達。</p>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-zinc-300">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-lime-500/20 text-lime-400 text-xs px-2 py-0.5 rounded font-bold">保留</span>
+                        <span>政客言論轉述/評論</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-lime-500/20 text-lime-400 text-xs px-2 py-0.5 rounded font-bold">保留</span>
+                        <span>政策/法案評論</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-lime-500/20 text-lime-400 text-xs px-2 py-0.5 rounded font-bold">保留</span>
+                        <span>選舉/候選人言論</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-lime-500/20 text-lime-400 text-xs px-2 py-0.5 rounded font-bold">保留</span>
+                        <span>政治宣傳/理念</span>
+                      </div>
+                   </div>
+                </div>
+
+                {/* Section V: Misinformation */}
+                <div className="bg-orange-900/10 border border-orange-500/30 p-4 rounded-xl space-y-3">
+                   <h5 className="font-bold text-orange-400 text-base">✏️ 五、虛假訊息</h5>
+                   <div className="bg-orange-900/20 p-2 rounded text-xs text-orange-200 border border-orange-500/20 mb-2">
+                      ⚠️ 若驗證為虛假訊息，靠北版將進行<strong>「發文澄清」</strong>，但原則上<strong>「不刪除投稿」</strong>。
+                   </div>
+                   <ul className="space-y-2 text-zinc-300 text-sm">
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-500 shrink-0">•</span>
+                        <span><strong>錯誤資訊</strong>：因誤解或疏忽產生的錯誤。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-500 shrink-0">•</span>
+                        <span><strong>斷章取義</strong>：截取部分內容，扭曲原意。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-500 shrink-0">•</span>
+                        <span><strong>扭曲事實</strong>：過度誇大、縮小以改變原意。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-500 shrink-0">•</span>
+                        <span><strong>捏造訊息</strong>：完全虛構的事實。</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-500 shrink-0">•</span>
+                        <span><strong>深度偽造 (Deepfake)</strong>：AI 合成之虛假影像/音訊。</span>
+                      </li>
+                   </ul>
+                </div>
+                
+                <div className="text-center text-xs text-zinc-600 mt-6 font-mono">
+                   * 以上審稿細則將每 3~6 個月進行意見調查與調整。
                 </div>
               </div>
             </Modal>
@@ -665,8 +840,9 @@ export default function App() {
           </StepLayout>
         );
 
-      case 4: // Review & Identity
-        const emailStatus = checkEmailStatus(form.email);
+      case 4: // Review & Identity (Replaced Manual Input with Google Login)
+        const identity = user ? checkIdentity(user.email) : { valid: false, type: 'none', label: '', color: '' };
+        
         return (
           <StepLayout title="REVIEW / 確認" dangoMood="happy">
              <div className="bg-zinc-900 border-2 border-zinc-700 p-6 rounded-2xl space-y-4 relative overflow-hidden">
@@ -697,9 +873,9 @@ export default function App() {
                 </div>
              </div>
 
-             {/* Identity Verification Section - Updated Logic */}
+             {/* Identity Verification Section - Google Login */}
              <div className={`border p-4 rounded-2xl flex flex-col gap-3 transition-colors ${
-                 form.email ? (emailStatus.valid ? 'bg-zinc-900 border-zinc-700' : 'bg-red-900/10 border-red-500/50') : 'bg-zinc-900 border-zinc-700'
+                 user ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-900 border-lime-400 shadow-[0_0_15px_rgba(163,230,53,0.15)]'
              }`}>
                  <div className="flex items-center gap-2 font-bold justify-between">
                     <div className="flex items-center gap-2 text-cyan-400">
@@ -707,47 +883,48 @@ export default function App() {
                         <span>身分標註 (必填)</span>
                     </div>
                     {/* Status Badge */}
-                    {form.email && emailStatus.valid && (
-                        <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-zinc-800 border ${
-                            emailStatus.type === 'school' ? 'border-green-500 text-green-400' : 'border-blue-500 text-blue-400'
-                        }`}>
-                            {emailStatus.type === 'school' ? <BadgeCheck size={14}/> : <User size={14} />}
-                            {emailStatus.label}
+                    {user && (
+                        <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-zinc-800 border ${identity.color}`}>
+                            {identity.type === 'school' ? <BadgeCheck size={14}/> : <User size={14} />}
+                            {identity.label}
                         </div>
                     )}
                  </div>
                  
-                 <div className="relative">
-                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-                     <input 
-                        type="email"
-                        placeholder="請輸入 Google 帳號或學校信箱"
-                        value={form.email}
-                        onChange={handleEmailChange}
-                        className={`w-full bg-zinc-900 border rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none transition-all placeholder-zinc-600 ${
-                            !form.email ? 'border-zinc-700 focus:border-cyan-400' :
-                            emailStatus.valid ? 'border-zinc-700 focus:border-green-400' : 'border-red-500 focus:border-red-500'
-                        }`}
-                     />
-                     {form.email && (
-                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                             {emailStatus.valid ? (
-                                 <BadgeCheck className={emailStatus.color} size={20} />
-                             ) : (
-                                 <AlertOctagon className={emailStatus.color} size={20} />
-                             )}
-                         </div>
-                     )}
-                 </div>
-                 
-                 {!emailStatus.valid && form.email ? (
-                     <p className="text-xs text-red-400 pl-1 font-bold">
-                         ⛔ 錯誤：{emailStatus.msg}
-                     </p>
+                 {!user ? (
+                   <div className="flex flex-col items-center justify-center py-4 space-y-3">
+                      {/* Configuration Warning */}
+                      {GOOGLE_CLIENT_ID.includes("YOUR_GOOGLE_CLIENT_ID") ? (
+                        <div className="p-4 bg-red-500/20 border border-red-500 rounded-xl text-center">
+                          <AlertTriangle className="mx-auto text-red-500 mb-2" />
+                          <p className="font-bold text-red-500">系統未設定 Client ID</p>
+                          <p className="text-xs text-red-200 mt-1">請在 App.tsx 填入您的 Google Client ID</p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-zinc-400 text-sm">請登入 Google 帳號以驗證真實身分</p>
+                          <div id="google-signin-btn" ref={googleBtnRef} className="h-12 flex justify-center"></div>
+                          <p className="text-xs text-zinc-600">※ 系統將自動判讀是否為一中生</p>
+                        </>
+                      )}
+                   </div>
                  ) : (
-                     <p className="text-xs text-zinc-500 pl-1">
-                         ※ 僅支援 <span className="font-mono text-cyan-500">gmail.com</span> 或 <span className="font-mono text-cyan-500">tc.edu.tw</span> 教育網域。
-                     </p>
+                   <div className="flex items-center justify-between bg-zinc-800 p-3 rounded-xl border border-zinc-700">
+                      <div className="flex items-center gap-3">
+                        <img src={user.picture} alt="Avatar" className="w-10 h-10 rounded-full border border-zinc-600" />
+                        <div>
+                          <div className="font-bold text-white text-sm">{user.name}</div>
+                          <div className="text-xs text-zinc-500 font-mono">{user.email}</div>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setUser(null)}
+                        className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors"
+                        title="登出 / 切換帳號"
+                      >
+                        <LogOut size={18} />
+                      </button>
+                   </div>
                  )}
              </div>
 
@@ -766,7 +943,7 @@ export default function App() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleSubmit}
-                    disabled={isSubmitting || !emailStatus.valid} // Block submit if email invalid
+                    disabled={isSubmitting || !user} // Block submit if not logged in
                     className="flex-1 py-4 rounded-xl font-black text-lg tracking-widest bg-gradient-to-r from-lime-400 to-cyan-400 text-black shadow-[0_0_20px_rgba(163,230,53,0.4)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 disabled:bg-none disabled:bg-zinc-800 disabled:text-zinc-600 disabled:shadow-none"
                   >
                     {isSubmitting ? (
@@ -805,7 +982,7 @@ export default function App() {
              <span className="text-xs text-lime-400">(請靜待小編~審核後就會發文囉!)</span>
            </p>
            <button 
-             onClick={resetForm} // Changed from window.location.reload()
+             onClick={resetForm}
              className="px-8 py-3 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold transition-all"
            >
              再投一篇
