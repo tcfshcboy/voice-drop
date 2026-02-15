@@ -411,13 +411,18 @@ export default function App() {
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    // Payload now sends the credential (token) instead of just the email string
+    // Calculate identity again to be sure (though user object has email)
+    const identityInfo = checkIdentity(user.email);
+
+    // Payload now sends email and identity label explicitely
     let payload: any = {
         agreed: form.agreed ? "是" : "否",
         category: form.category.label,
         content: form.content,
         hasImage: form.hasImage ? "有" : "沒有",
-        token: user.credential, // Send the JWT!
+        token: user.credential, 
+        email: user.email, // Add Email field
+        identityLabel: identityInfo.label, // Add Identity Label (一中生投稿/一般投稿)
         imageLink: ""
     };
 
