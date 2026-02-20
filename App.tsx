@@ -102,7 +102,7 @@ const CATEGORIES: CategoryType[] = [
     color: 'text-green-400 border-green-400 shadow-green-400/50', 
     desc: "大家怎麼看？", 
     mood: 'thinking',
-    placeholder: "不怕你問  只怕你一失神，\n就已築起  千行蓋樓文！"
+    placeholder: "不怕你問 只怕你一失神，\n就已築起 千行蓋樓文！"
   },
   { 
     id: '生日', 
@@ -112,7 +112,7 @@ const CATEGORIES: CategoryType[] = [
     color: 'text-orange-400 border-orange-400 shadow-orange-400/50', 
     desc: "祝壽專用", 
     mood: 'happy',
-    placeholder: "若你玩膩了蛋糕  蠟燭  刮鬍泡，\n還有什麼祝福比上靠北更「終生難忘」！"
+    placeholder: "當玩膩了蛋糕、蠟燭、刮鬍泡，\n還有什麼祝福比上靠北更「終生難忘」！"
   },
   { 
     id: '假訊息', 
@@ -802,7 +802,7 @@ export default function App() {
            </h1>
            <p className="text-zinc-400">
              感謝您的貢獻，您的聲音已被接收🍡<br/>
-             <span className="text-xs text-lime-400">(請靜待小編~審核後就會發文囉!)</span>
+             <span className="text-xs text-lime-400"> 串流湧動！請靜待小編~審核後就會發文囉！</span>
            </p>
            <button 
              onClick={resetForm} // Changed from window.location.reload()
