@@ -793,7 +793,7 @@ export default function App() {
                      className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-2 w-36 transition-all ${form.hasImage ? 'border-fuchsia-500 bg-fuchsia-500/10' : 'border-zinc-600 hover:border-fuchsia-500 hover:text-fuchsia-500 text-zinc-400'}`}
                   >
                     <ImageIcon size={32} className={form.hasImage ? "text-fuchsia-500" : ""} />
-                    <span className={`font-bold ${form.hasImage ? "text-fuchsia-500" : ""}`}>我有檔案 / 連結</span>
+                    <span className={`font-bold ${form.hasImage ? "text-fuchsia-500" : ""}`}>附檔/連結</span>
                   </button>
                 </div>
 
@@ -913,6 +913,7 @@ export default function App() {
                      )}
                    </div>
                 </div>
+             </div>
 
              {/* Identity Verification Section - Google Login */}
              <div className={`border p-4 rounded-2xl flex flex-col gap-3 transition-colors ${
