@@ -775,8 +775,8 @@ export default function App() {
           <StepLayout title="ATTACHMENT / 附件" dangoMood="shocked">
              <div className="bg-zinc-800/50 backdrop-blur-md border border-zinc-700 p-8 rounded-2xl text-center space-y-6">
                 <div className="text-zinc-400">
-                  <p className="mb-2 text-base text-lime-400">有圖有影有真相？</p>
-                  <p className="text-xs text-lime-400/80">※ 檔案太大傳不上來？直接貼連結也 OK！</p>
+                  <p className="mb-2 text-base text-lime-400">有圖、有影、有真相？</p>
+                  <p className="text-xs text-lime-400/80">※ 檔案太大，傳不上來？直接貼連結也 OK！</p>
                 </div>
 
                 <div className="flex justify-center gap-4">
@@ -793,7 +793,7 @@ export default function App() {
                      className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-2 w-36 transition-all ${form.hasImage ? 'border-fuchsia-500 bg-fuchsia-500/10' : 'border-zinc-600 hover:border-fuchsia-500 hover:text-fuchsia-500 text-zinc-400'}`}
                   >
                     <ImageIcon size={32} className={form.hasImage ? "text-fuchsia-500" : ""} />
-                    <span className={`font-bold ${form.hasImage ? "text-fuchsia-500" : ""}`}>我有檔案 / 連結</span>
+                    <span className={`font-bold ${form.hasImage ? "text-fuchsia-500" : ""}`}>附檔/連結</span>
                   </button>
                 </div>
 
