@@ -913,6 +913,7 @@ export default function App() {
                      )}
                    </div>
                 </div>
+             </div>
 
              {/* Identity Verification Section - Google Login */}
              <div className={`border p-4 rounded-2xl flex flex-col gap-3 transition-colors ${
