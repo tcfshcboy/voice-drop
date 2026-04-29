@@ -151,6 +151,7 @@ type FormState = {
   content: string;
   hasImage: boolean;
   imageFile: File | null;
+  website: string; // 🌟 新增：蜜罐欄位 (Honeypot) 的狀態
   email: string;
   videoUrl: string; // 新增
 };
@@ -161,8 +162,7 @@ const INITIAL_FORM_STATE: FormState = {
   content: '',
   hasImage: false,
   imageFile: null,
-  email: '',
-  videoUrl: '' // 新增
+  website: '', // 🌟 新增：初始化為空字串
 };
 
 // --- HELPERS ---
@@ -415,6 +415,14 @@ export default function App() {
   const handleSubmit = async () => {
     if (!form.category || !user) return;
     
+    // 🌟 核心防禦：蜜罐檢查
+    // 如果這個隱藏欄位被填寫了，我們就假裝送出成功，但實際上不發送任何請求給後端
+    if (form.website !== '') {
+      console.warn("Honeypot triggered. Bot detected.");
+      setSubmitted(true); // 讓機器人以為成功了
+      return; 
+    }
+
     setIsSubmitting(true);
     setErrorMsg(null);
 
@@ -430,8 +438,8 @@ export default function App() {
         token: user.credential, 
         email: user.email, // Add Email field
         identityLabel: identityInfo.label, // Add Identity Label (一中生投稿/一般投稿)
-        imageLink: "", // Fallback
-        videoUrl: form.videoUrl // 新增把網址傳給後端
+        imageLink: "",
+        website: form.website // 將空字串也傳給後端，配合 GAS 端的二次防護
     };
 
     try {
@@ -873,7 +881,7 @@ export default function App() {
             </div>
           </StepLayout>
         );
-        
+
       case 4: // Review & Identity (Replaced Manual Input with Google Login)
         const identity = user ? checkIdentity(user.email) : { valid: false, type: 'none', label: '', color: '' };
         
@@ -968,6 +976,20 @@ export default function App() {
                       </button>
                    </div>
                  )}
+
+                 {/* 🌟 隱藏的蜜罐欄位 (Honeypot) - 機器人會填寫，真人看不到 */}
+                 <div style={{ display: 'none', opacity: 0, position: 'absolute', left: '-9999px' }} aria-hidden="true">
+                    <label htmlFor="website">請勿填寫此欄位</label>
+                    <input 
+                      type="text" 
+                      id="website" 
+                      name="website" 
+                      value={form.website} 
+                      onChange={e => setForm({...form, website: e.target.value})} 
+                      tabIndex={-1} 
+                      autoComplete="off" 
+                    />
+                 </div>
              </div>
 
              <div className="space-y-4">
