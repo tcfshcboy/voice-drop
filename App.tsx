@@ -19,9 +19,6 @@ import {
   Info,
   UploadCloud,
   FileImage,
-  FileVideo, // 新增影片上傳欄
-  Mail,
-  Link, // 新增連結輸入欄
   BadgeCheck,
   User,
   LogOut
@@ -151,8 +148,7 @@ type FormState = {
   content: string;
   hasImage: boolean;
   imageFile: File | null;
-  email: string;
-  videoUrl: string; // 新增
+  website: string; // 🌟 新增：蜜罐欄位 (Honeypot) 的狀態
 };
 
 const INITIAL_FORM_STATE: FormState = {
@@ -161,8 +157,7 @@ const INITIAL_FORM_STATE: FormState = {
   content: '',
   hasImage: false,
   imageFile: null,
-  email: '',
-  videoUrl: '' // 新增
+  website: '', // 🌟 新增：初始化為空字串
 };
 
 // --- HELPERS ---
@@ -345,8 +340,8 @@ export default function App() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 50 * 1024 * 1024) { // 50MB limit
-        alert("圖片太大了！請上傳小於 50MB 的圖片或影片 🍡");
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert("圖片太大了！請上傳小於 5MB 的圖片 🍡");
         if(fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -415,6 +410,14 @@ export default function App() {
   const handleSubmit = async () => {
     if (!form.category || !user) return;
     
+    // 🌟 核心防禦：蜜罐檢查
+    // 如果這個隱藏欄位被填寫了，我們就假裝送出成功，但實際上不發送任何請求給後端
+    if (form.website !== '') {
+      console.warn("Honeypot triggered. Bot detected.");
+      setSubmitted(true); // 讓機器人以為成功了
+      return; 
+    }
+
     setIsSubmitting(true);
     setErrorMsg(null);
 
@@ -430,8 +433,8 @@ export default function App() {
         token: user.credential, 
         email: user.email, // Add Email field
         identityLabel: identityInfo.label, // Add Identity Label (一中生投稿/一般投稿)
-        imageLink: "", // Fallback
-        videoUrl: form.videoUrl // 新增把網址傳給後端
+        imageLink: "",
+        website: form.website // 將空字串也傳給後端，配合 GAS 端的二次防護
     };
 
     try {
@@ -775,25 +778,25 @@ export default function App() {
           <StepLayout title="ATTACHMENT / 附件" dangoMood="shocked">
              <div className="bg-zinc-800/50 backdrop-blur-md border border-zinc-700 p-8 rounded-2xl text-center space-y-6">
                 <div className="text-zinc-400">
-                  <p className="mb-2 text-base text-lime-400">有圖有影有真相？</p>
-                  <p className="text-xs text-lime-400/80">※ 檔案太大傳不上來？直接貼連結也 OK！</p>
+                  <p className="mb-2 text-base text-lime-400">有圖像有真相？</p>
+                  <p className="text-xs text-lime-400/80">※ 圖片/影像將會直接上傳至雲端，單檔限制 5MB。</p>
                 </div>
 
                 <div className="flex justify-center gap-4">
                   <button 
-                    onClick={() => { setForm({...form, hasImage: false, imageFile: null, videoUrl: ''}); nextStep(); }}
+                    onClick={() => { setForm({...form, hasImage: false, imageFile: null}); nextStep(); }}
                     className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-2 w-32 transition-all ${!form.hasImage ? 'border-zinc-600 hover:border-zinc-500 bg-zinc-900' : 'border-zinc-700 opacity-50'}`}
                   >
                     <X size={32} className="text-zinc-500" />
-                    <span className="font-bold text-zinc-400">沒有附件</span>
+                    <span className="font-bold text-zinc-400">沒有</span>
                   </button>
 
                   <button 
                      onClick={() => { setForm({...form, hasImage: true}); }}
-                     className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-2 w-36 transition-all ${form.hasImage ? 'border-fuchsia-500 bg-fuchsia-500/10' : 'border-zinc-600 hover:border-fuchsia-500 hover:text-fuchsia-500 text-zinc-400'}`}
+                     className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-2 w-32 transition-all ${form.hasImage ? 'border-fuchsia-500 bg-fuchsia-500/10' : 'border-zinc-600 hover:border-fuchsia-500 hover:text-fuchsia-500 text-zinc-400'}`}
                   >
                     <ImageIcon size={32} className={form.hasImage ? "text-fuchsia-500" : ""} />
-                    <span className={`font-bold ${form.hasImage ? "text-fuchsia-500" : ""}`}>附檔/連結</span>
+                    <span className={`font-bold ${form.hasImage ? "text-fuchsia-500" : ""}`}>我有圖片</span>
                   </button>
                 </div>
 
@@ -803,50 +806,30 @@ export default function App() {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden space-y-4 pt-2"
+                      className="overflow-hidden"
                     >
-                      {/* 上傳檔案區塊 */}
-                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-zinc-600 rounded-xl cursor-pointer hover:border-fuchsia-500 hover:bg-zinc-800/50 transition-all group relative">
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-zinc-600 rounded-xl cursor-pointer hover:border-fuchsia-500 hover:bg-zinc-800/50 transition-all group">
                          {form.imageFile ? (
                            <div className="flex flex-col items-center text-fuchsia-400">
-                              {form.imageFile.type.startsWith('video/') ? (
-                                 <FileVideo size={32} className="mb-2"/>
-                              ) : (
-                                 <FileImage size={32} className="mb-2"/>
-                              )}
+                              <FileImage size={32} className="mb-2"/>
                               <span className="font-mono text-sm max-w-[200px] truncate">{form.imageFile.name}</span>
                               <span className="text-xs text-zinc-500">{(form.imageFile.size / 1024 / 1024).toFixed(2)} MB</span>
                            </div>
                          ) : (
                            <div className="flex flex-col items-center text-zinc-500 group-hover:text-zinc-300">
                               <UploadCloud size={32} className="mb-2"/>
-                              <span className="text-sm font-bold">點擊上傳圖片或影片 (選填)</span>
-                              <span className="text-xs text-lime-400/80 mt-1">單檔限制 50MB</span>
+                              <span className="text-sm font-bold">點擊上傳圖片</span>
+                              <span className="text-xs text-lime-400/80">僅支援 JPG, PNG 檔</span>
                            </div>
                          )}
                          <input 
                            ref={fileInputRef}
                            type="file" 
-                           accept="image/*,video/*" 
+                           accept="image/*" 
                            onChange={handleFileChange}
                            className="hidden" 
                          />
                       </label>
-
-                      {/* 新增：影片網址輸入區塊 */}
-                      <div className="text-left bg-zinc-900/50 p-4 rounded-xl border border-zinc-700">
-                         <label className="flex items-center gap-2 text-zinc-300 font-bold mb-2 text-sm">
-                           <Link size={16} className="text-fuchsia-400" /> 
-                           外部媒體連結 <span className="text-xs text-zinc-500 font-normal">(選填)</span>
-                         </label>
-                         <input 
-                           type="url"
-                           placeholder="貼上 IG / YouTube / 雲端硬碟 連結..."
-                           value={form.videoUrl}
-                           onChange={(e) => setForm({...form, videoUrl: e.target.value})}
-                           className="w-full bg-zinc-900 border border-zinc-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:border-fuchsia-400 focus:ring-1 focus:ring-fuchsia-400 transition-all placeholder-zinc-600 text-sm font-mono"
-                         />
-                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -860,12 +843,11 @@ export default function App() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={nextStep}
-                // 修改防呆邏輯：如果有勾選「我有檔案/連結」，則必須至少上傳檔案或填寫網址其中之一
-                disabled={form.hasImage && !form.imageFile && !form.videoUrl.trim()}
-                className={`flex-1 py-4 rounded-xl font-black text-lg tracking-widest transition-all ${
-                   (form.hasImage && !form.imageFile && !form.videoUrl.trim())
+                disabled={form.hasImage && !form.imageFile} // Disable if checked but no file
+                className={`flex-1 py-4 rounded-xl font-black text-lg tracking-widest shadow-[0_0_20px_rgba(217,70,239,0.4)] transition-all ${
+                   (form.hasImage && !form.imageFile)
                    ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed shadow-none'
-                   : 'bg-fuchsia-500 text-white shadow-[0_0_20px_rgba(217,70,239,0.4)]'
+                   : 'bg-fuchsia-500 text-white'
                 }`}
               >
                 NEXT
@@ -873,7 +855,7 @@ export default function App() {
             </div>
           </StepLayout>
         );
-        
+
       case 4: // Review & Identity (Replaced Manual Input with Google Login)
         const identity = user ? checkIdentity(user.email) : { valid: false, type: 'none', label: '', color: '' };
         
@@ -899,19 +881,11 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 pt-4 border-t border-zinc-800">
-                   <div className={`w-3 h-3 rounded-full mt-1 shrink-0 ${form.hasImage ? 'bg-green-500' : 'bg-zinc-600'}`} />
-                   <div className="flex flex-col gap-1 w-full overflow-hidden">
-                     <span className="text-sm text-zinc-400 font-bold">
-                        {form.hasImage && form.imageFile ? `媒體附件: ${form.imageFile.name}` : (form.videoUrl ? '有提供外部連結' : '無附件')}
-                     </span>
-                     {form.videoUrl && (
-                       <div className="flex items-center gap-1 text-xs text-fuchsia-400 font-mono bg-fuchsia-500/10 p-2 rounded-lg border border-fuchsia-500/20 truncate">
-                         <Link size={12} className="shrink-0" />
-                         <span className="truncate">{form.videoUrl}</span>
-                       </div>
-                     )}
-                   </div>
+                <div className="flex items-center gap-2 pt-4 border-t border-zinc-800">
+                   <div className={`w-3 h-3 rounded-full ${form.hasImage ? 'bg-green-500' : 'bg-zinc-600'}`} />
+                   <span className="text-sm text-zinc-400">
+                      {form.hasImage ? `圖片附件: ${form.imageFile?.name || '無'}` : '無附件影像'}
+                   </span>
                 </div>
              </div>
 
@@ -968,6 +942,20 @@ export default function App() {
                       </button>
                    </div>
                  )}
+
+                 {/* 🌟 隱藏的蜜罐欄位 (Honeypot) - 機器人會填寫，真人看不到 */}
+                 <div style={{ display: 'none', opacity: 0, position: 'absolute', left: '-9999px' }} aria-hidden="true">
+                    <label htmlFor="website">請勿填寫此欄位</label>
+                    <input 
+                      type="text" 
+                      id="website" 
+                      name="website" 
+                      value={form.website} 
+                      onChange={e => setForm({...form, website: e.target.value})} 
+                      tabIndex={-1} 
+                      autoComplete="off" 
+                    />
+                 </div>
              </div>
 
              <div className="space-y-4">
