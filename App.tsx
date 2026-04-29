@@ -24,7 +24,8 @@ import {
   Link, // 新增連結輸入欄
   BadgeCheck,
   User,
-  LogOut
+  LogOut,
+  Megaphone // 🌟 新增公告圖示
 } from 'lucide-react';
 
 // Add global type definition for Google Identity Services
@@ -318,6 +319,30 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
+  // --- 🌟 新增：公告狀態與載入邏輯 ---
+  const [announcement, setAnnouncement] = useState<{show: boolean, title: string, content: string, date: string} | null>(null);
+
+  useEffect(() => {
+    // 網頁載入時，發送 GET 請求抓取公告
+    const fetchAnnouncement = async () => {
+      try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'GET',
+          redirect: 'follow' // 允許跟隨 GAS 的重新導向
+        });
+        const data = await response.json();
+        
+        if (data && data.show) {
+          setAnnouncement(data);
+        }
+      } catch (err) {
+        console.error("無法載入公告", err);
+      }
+    };
+    
+    fetchAnnouncement();
+  }, []);
+
   // Initialize Google Identity Services
   useEffect(() => {
     // Only initialize if we are on the step that requires login or globally once
@@ -479,6 +504,34 @@ export default function App() {
     if (!form.category) return false;
     const len = form.content.length;
     return len > 0 && len <= form.category.limit;
+  };
+
+  // --- 🌟 新增：公告 UI 渲染函數 ---
+  const renderAnnouncement = () => {
+    if (!announcement || step !== 0) return null; // 只在首頁 (Step 0) 顯示
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -20, height: 0 }}
+        animate={{ opacity: 1, y: 0, height: 'auto' }}
+        className="w-full max-w-lg mx-auto mb-2 relative group px-6 z-10"
+      >
+        {/* 背景霓虹發光層 */}
+        <div className="absolute inset-0 mx-6 bg-gradient-to-r from-lime-400 to-cyan-400 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500" />
+        
+        {/* 公告主體卡片 */}
+        <div className="relative p-5 bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 rounded-2xl flex flex-col gap-3 shadow-2xl">
+           <div className="flex items-center gap-2 text-lime-400 border-b border-zinc-800 pb-2">
+              <Megaphone size={18} className="animate-pulse" />
+              <span className="font-black tracking-widest text-sm">{announcement.title}</span>
+              <span className="ml-auto text-xs text-zinc-500 font-mono">{announcement.date}</span>
+           </div>
+           <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap font-medium">
+              {announcement.content}
+           </p>
+        </div>
+      </motion.div>
+    );
   };
 
   // Render Steps
@@ -1082,7 +1135,11 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col relative">
+      <main className="flex-1 flex flex-col relative pt-4">
+        
+        {/* 🌟 在這裡呼叫公告渲染函數 */}
+        {renderAnnouncement()}
+
         <AnimatePresence mode="wait">
            {renderStep()}
         </AnimatePresence>
