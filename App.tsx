@@ -163,6 +163,8 @@ const INITIAL_FORM_STATE: FormState = {
   hasImage: false,
   imageFile: null,
   website: '', // 🌟 新增：初始化為空字串
+  email: '',      // 🌟 補上 email 的初始值
+  videoUrl: '',   // 🌟 補上 videoUrl 的初始值
 };
 
 // --- HELPERS ---
