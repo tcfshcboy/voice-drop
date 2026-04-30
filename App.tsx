@@ -36,11 +36,10 @@ declare global {
 }
 
 // --- CONFIGURATION ---
-// ⚠️ [重要] 請將此處替換為您在 Apps Script 部署後取得的 "Web App URL"
+// Apps Script "Web App URL"
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwMEU3vYVDZA9xMgINZF0OjZ_4d6vk4jap8tIPOt08M7nNAl-zRjlPDlQEueAj3vTzF5g/exec";
 
-// ⚠️ [重要] 請在此填入您的 Google Cloud Console Client ID
-// 格式通常是: "xxxxxxxx-xxxxxxxx.apps.googleusercontent.com"
+// Google Cloud Console Client ID
 const GOOGLE_CLIENT_ID = "1003959654198-blqqu860q4n44m0s4vkmnauqrm8c6d67.apps.googleusercontent.com"; 
 
 // --- TYPES & CONSTANTS ---
